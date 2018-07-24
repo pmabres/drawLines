@@ -1,103 +1,139 @@
-let c=document.getElementById("canvas1");
-let c2=document.getElementById("canvas2");
-let ctx=c.getContext("2d");
-let ctx2=c2.getContext("2d");
+
 function vec2(x,y) {
-  return { x:x, y:y }
+    return { x:x, y:y }
 }
 
-const generate = (pointsAmount, seed, width, height) => {
-  // let startPoint = vec2(Math.random() * width, height);
-  let startPoint = vec2(width, Math.random() * height);
-  return drawHorizontalCosine(pointsAmount, seed, width, height, startPoint);
-  // noise.seed(seed);
-  // points = [];
-  // for (let x = 0; x < width; x++) {
-  //   for (let y = 0; y < height; y++) {
-  //     // All noise functions return values in the range of -1 to 1.
-  //     // noise.simplex2 and noise.perlin2 for 2d noise
-  //     var value = noise.simplex2(x, y);
-  //     if (value >= 0.997889 && points.length < pointsAmount) {
-  //       points.push(vec2(y, x));
-  //     }
-  //   }
-  // }
-  // return points;
+const generate = (pointsAmount, seed, width, height, pointsPerSection, functions) => {
+    let startPoint = vec2(width / 2, height);
+    let sections = Math.floor(pointsAmount / pointsPerSection);
+    let remaining = pointsAmount % pointsPerSection;
+    let drawPoints = [];
+    let drawHeight = height/(sections+1) || height;
+    for (let i = 1; i <= sections; i++) {
+        let pickedFunction = Math.floor(Math.random()*functions.length);
+        seed = Math.random();
+        let tempPoints = functions[pickedFunction](pointsPerSection, seed, width, drawHeight, startPoint);
+        startPoint = tempPoints[tempPoints.length-1];
+        drawPoints = drawPoints.concat(tempPoints);
+    }
+    if (remaining >= 0) {
+        let pickedFunction = Math.floor(Math.random()*functions.length);
+        drawPoints = drawPoints.concat(functions[pickedFunction](remaining-1, seed, width, drawHeight, startPoint));
+    }
+    drawPoints.push(vec2(width/2, 0));
+    console.log(pointsAmount);
+    console.log(drawPoints.length);
+    return drawPoints;
+    // noise.seed(seed);
+    // points = [];
+    // for (let x = 0; x < width; x++) {
+    //   for (let y = 0; y < height; y++) {
+    //     // All noise functions return values in the range of -1 to 1.
+    //     // noise.simplex2 and noise.perlin2 for 2d noise
+    //     var value = noise.simplex2(x, y);
+    //     if (value >= 0.997889 && points.length < pointsAmount) {
+    //       points.push(vec2(y, x));
+    //     }
+    //   }
+    // }
+    // return points;
 };
 
+
 //Radius should go from .01 to 1
+const drawSpiral = (pointsAmount, radius, width, height, startPoint) => {
+    let points = [];
+    let currentPoint = startPoint;
+    for (let i = pointsAmount-1; i >= 0; i --) {
+        let newX = Math.sin(currentPoint.y)*radius*width/2+width/2;
+        let newY = startPoint.y-Math.cos(newX)*radius*height/2-height/2;
+        currentPoint = vec2(newX, newY);
+        points.push(currentPoint);
+    }
+    return points;
+};
+
+
+//Radius should go from .04 to 1
 const drawVerticalSine = (pointsAmount, radius, width, height, startPoint) => {
-  let points = [];
-  let minimumSineRadius = 0.4;
-  let currentPoint = startPoint;
-  if (radius < minimumSineRadius) radius += minimumSineRadius;
-  for (let i = pointsAmount-1; i >= 0; i --) {
-    points.push(currentPoint);
-    let newX = Math.sin(height/pointsAmount*i)*radius*width/2+width/2;
-    let newY = height/pointsAmount*i;
-    currentPoint = vec2(newX, newY);
-  }
-  return points;
+    let points = [];
+    let minimumSineRadius = 0.4;
+    let currentPoint = startPoint;
+    if (radius < minimumSineRadius) radius += minimumSineRadius;
+    for (let i = pointsAmount-1; i >= 0; i --) {
+        let increaseY = currentPoint.y - height/pointsAmount;
+        let newX = Math.sin(height/pointsAmount*i)*radius*width/2+width/2;
+        currentPoint = vec2(newX, increaseY);
+        points.push(currentPoint);
+    }
+    return points;
 };
 
 const drawHorizontalCosine = (pointsAmount, radius, width, height, startPoint) => {
-  let points = [];
-  let minimumCosineRadius = 0.4;
-  let currentPoint = startPoint;
-  if (radius < minimumCosineRadius) radius += minimumCosineRadius;
-  for (let i = pointsAmount-1; i >= 0; i --) {
-    points.push(currentPoint);
-    let newY = Math.cos(width/pointsAmount*i)*radius*height/2+height/2;
-    let newX = width/pointsAmount*i;
-    currentPoint = vec2(newX, newY);
-  }
-  return points;
+    let points = [];
+    let minimumCosineRadius = 0.4;
+    let currentPoint = startPoint;
+    let direction = 1;
+    if (startPoint.x > width/2)
+        direction = -1;
+    if (radius < minimumCosineRadius) radius += minimumCosineRadius;
+    for (let i = pointsAmount-1; i >= 1; i --) {
+        let increaseX = currentPoint.x + width/2/pointsAmount*direction;
+        let newY = startPoint.y-Math.cos(increaseX)*radius*height/2-height/2;
+        currentPoint = vec2(increaseX, newY);
+        points.push(currentPoint);
+    }
+    let increaseX = currentPoint.x + width/2/pointsAmount*direction;
+    points.push(vec2(increaseX, startPoint.y-height));
+    return points;
 };
 
 
-const main = () => {
-  //let dots = [ vec2(20,20), vec2(30,30), vec2(60,60),vec2(90,80) ,vec2(120,200),vec2(200,100),vec2(240,10)];
-  let dots = generate(20, Math.random(), 300,300);
-  console.log(dots);
-  drawLines(dots, ctx);
-  drawCurves(dots, ctx2);
-  drawCircles(dots, ctx);
-  drawCircles(dots, ctx2);
+const main = (pointAmount, ctx, ctx2, width, height) => {
+    ctx.clearRect(0,0,width,height);
+    ctx2.clearRect(0,0,width,height);
+    let pointsPerSection = 10;
+    pointAmount = 10;
+    let dots = generate(pointAmount, Math.random(), width, height, pointsPerSection, functions);
+    drawLines(dots, ctx);
+    drawCurves(dots, ctx2);
+    drawCircles(dots, ctx);
+    drawCircles(dots, ctx2);
 };
 
 const drawCircles = (dots, context) => {
-  dots.map((dot) => {
-    drawCircle(dot, context);
-  })
+    dots.map((dot) => {
+        drawCircle(dot, context);
+    })
 };
 
 const drawCircle = ({x, y}, context) => {
-  context.beginPath();
-  context.arc(x, y, 5, 0, 2 * Math.PI, false);
-  context.fillStyle = 'green';
-  context.fill();
+    context.beginPath();
+    context.arc(x, y, 5, 0, 2 * Math.PI, false);
+    context.fillStyle = 'green';
+    context.fill();
 };
 
 const drawCurves = (points, ctx) => {
 
-  ctx.moveTo((points[0].x), points[0].y);
-  pts = [];
-  points.map(point => {
-    pts.push(point.x);
-    pts.push(point.y);
-  });
-  curve(ctx, pts);
-  ctx.stroke();
+    ctx.moveTo((points[0].x), points[0].y);
+    pts = [];
+    points.map(point => {
+        pts.push(point.x);
+        pts.push(point.y);
+    });
+    curve(ctx, pts);
+    ctx.stroke();
 };
 
 const drawLines = (dots, context) => {
 
-  context.beginPath();
-  context.moveTo(dots[0].x,dots[0].y);
-  for (let i = 1; i < dots.length; i++) {
-    context.lineTo(dots[i].x, dots[i].y);
-    context.stroke();
-  }
+    context.beginPath();
+    context.moveTo(dots[0].x,dots[0].y);
+    for (let i = 1; i < dots.length; i++) {
+        context.lineTo(dots[i].x, dots[i].y);
+        context.stroke();
+    }
 };
 
 
@@ -122,105 +158,105 @@ const drawLines = (dots, context) => {
  */
 function curve(ctx, points, tension, numOfSeg, close) {
 
-  'use strict';
+    'use strict';
 
-  if (typeof points === "undefined" || points.length < 2) return new Float32Array(0);
+    if (typeof points === "undefined" || points.length < 2) return new Float32Array(0);
 
-  // options or defaults
-  tension = typeof tension === "number" ? tension : 0.5;
-  numOfSeg = typeof numOfSeg === "number" ? numOfSeg : 25;
+    // options or defaults
+    tension = typeof tension === "number" ? tension : 0.5;
+    numOfSeg = typeof numOfSeg === "number" ? numOfSeg : 25;
 
-  var pts,															// for cloning point array
-    i = 1,
-    l = points.length,
-    rPos = 0,
-    rLen = (l-2) * numOfSeg + 2 + (close ? 2 * numOfSeg: 0),
-    res = new Float32Array(rLen),
-    cache = new Float32Array((numOfSeg + 2) << 2),
-    cachePtr = 4;
+    var pts,															// for cloning point array
+        i = 1,
+        l = points.length,
+        rPos = 0,
+        rLen = (l-2) * numOfSeg + 2 + (close ? 2 * numOfSeg: 0),
+        res = new Float32Array(rLen),
+        cache = new Float32Array((numOfSeg + 2) << 2),
+        cachePtr = 4;
 
-  pts = points.slice(0);
+    pts = points.slice(0);
 
-  if (close) {
-    pts.unshift(points[l - 1]);										// insert end point as first point
-    pts.unshift(points[l - 2]);
-    pts.push(points[0], points[1]); 								// first point as last point
-  }
-  else {
-    pts.unshift(points[1]);											// copy 1. point and insert at beginning
-    pts.unshift(points[0]);
-    pts.push(points[l - 2], points[l - 1]);							// duplicate end-points
-  }
-
-  // cache inner-loop calculations as they are based on t alone
-  cache[0] = 1;														// 1,0,0,0
-
-  for (; i < numOfSeg; i++) {
-
-    var st = i / numOfSeg,
-      st2 = st * st,
-      st3 = st2 * st,
-      st23 = st3 * 2,
-      st32 = st2 * 3;
-
-    cache[cachePtr++] =	st23 - st32 + 1;							// c1
-    cache[cachePtr++] =	st32 - st23;								// c2
-    cache[cachePtr++] =	st3 - 2 * st2 + st;							// c3
-    cache[cachePtr++] =	st3 - st2;									// c4
-  }
-
-  cache[++cachePtr] = 1;												// 0,1,0,0
-
-  // calc. points
-  parse(pts, cache, l, tension);
-
-  if (close) {
-    pts = [];
-    pts.push(points[l - 4], points[l - 3],
-      points[l - 2], points[l - 1], 							// second last and last
-      points[0], points[1],
-      points[2], points[3]); 								// first and second
-    parse(pts, cache, 4, tension);
-  }
-
-  function parse(pts, cache, l, tension) {
-
-    for (var i = 2, t; i < l; i += 2) {
-
-      var pt1 = pts[i],
-        pt2 = pts[i+1],
-        pt3 = pts[i+2],
-        pt4 = pts[i+3],
-
-        t1x = (pt3 - pts[i-2]) * tension,
-        t1y = (pt4 - pts[i-1]) * tension,
-        t2x = (pts[i+4] - pt1) * tension,
-        t2y = (pts[i+5] - pt2) * tension,
-        c = 0, c1, c2, c3, c4;
-
-      for (t = 0; t < numOfSeg; t++) {
-
-        c1 = cache[c++];
-        c2 = cache[c++];
-        c3 = cache[c++];
-        c4 = cache[c++];
-
-        res[rPos++] = c1 * pt1 + c2 * pt3 + c3 * t1x + c4 * t2x;
-        res[rPos++] = c1 * pt2 + c2 * pt4 + c3 * t1y + c4 * t2y;
-      }
+    if (close) {
+        pts.unshift(points[l - 1]);										// insert end point as first point
+        pts.unshift(points[l - 2]);
+        pts.push(points[0], points[1]); 								// first point as last point
     }
-  }
+    else {
+        pts.unshift(points[1]);											// copy 1. point and insert at beginning
+        pts.unshift(points[0]);
+        pts.push(points[l - 2], points[l - 1]);							// duplicate end-points
+    }
 
-  // add last point
-  l = close ? 0 : points.length - 2;
-  res[rPos++] = points[l++];
-  res[rPos] = points[l];
+    // cache inner-loop calculations as they are based on t alone
+    cache[0] = 1;														// 1,0,0,0
 
-  // add lines to path
-  for(i = 0, l = res.length; i < l; i += 2)
-    ctx.lineTo(res[i], res[i+1]);
+    for (; i < numOfSeg; i++) {
 
-  return res
+        var st = i / numOfSeg,
+            st2 = st * st,
+            st3 = st2 * st,
+            st23 = st3 * 2,
+            st32 = st2 * 3;
+
+        cache[cachePtr++] =	st23 - st32 + 1;							// c1
+        cache[cachePtr++] =	st32 - st23;								// c2
+        cache[cachePtr++] =	st3 - 2 * st2 + st;							// c3
+        cache[cachePtr++] =	st3 - st2;									// c4
+    }
+
+    cache[++cachePtr] = 1;												// 0,1,0,0
+
+    // calc. points
+    parse(pts, cache, l, tension);
+
+    if (close) {
+        pts = [];
+        pts.push(points[l - 4], points[l - 3],
+            points[l - 2], points[l - 1], 							// second last and last
+            points[0], points[1],
+            points[2], points[3]); 								// first and second
+        parse(pts, cache, 4, tension);
+    }
+
+    function parse(pts, cache, l, tension) {
+
+        for (var i = 2, t; i < l; i += 2) {
+
+            var pt1 = pts[i],
+                pt2 = pts[i+1],
+                pt3 = pts[i+2],
+                pt4 = pts[i+3],
+
+                t1x = (pt3 - pts[i-2]) * tension,
+                t1y = (pt4 - pts[i-1]) * tension,
+                t2x = (pts[i+4] - pt1) * tension,
+                t2y = (pts[i+5] - pt2) * tension,
+                c = 0, c1, c2, c3, c4;
+
+            for (t = 0; t < numOfSeg; t++) {
+
+                c1 = cache[c++];
+                c2 = cache[c++];
+                c3 = cache[c++];
+                c4 = cache[c++];
+
+                res[rPos++] = c1 * pt1 + c2 * pt3 + c3 * t1x + c4 * t2x;
+                res[rPos++] = c1 * pt2 + c2 * pt4 + c3 * t1y + c4 * t2y;
+            }
+        }
+    }
+
+    // add last point
+    l = close ? 0 : points.length - 2;
+    res[rPos++] = points[l++];
+    res[rPos] = points[l];
+
+    // add lines to path
+    for(i = 0, l = res.length; i < l; i += 2)
+        ctx.lineTo(res[i], res[i+1]);
+
+    return res
 }
 
 if (typeof exports !== "undefined") exports.curve = curve;
@@ -537,4 +573,34 @@ if (typeof exports !== "undefined") exports.curve = curve;
 //
 // })(this);
 
-main();
+
+let points = 0;
+// window.addEventListener('click', (ev) => {
+//     ev.preventDefault();
+//     main(++points);
+//     return false;
+// }, false);
+// window.addEventListener('contextmenu', (ev) => {
+//     ev.preventDefault();
+//     if (points > 0)
+//         main(--points);
+//     return false;
+// }, false);
+const functions = [];
+// functions.push(drawVerticalSine);
+// functions.push(drawHorizontalCosine);
+functions.push(drawSpiral);
+let c=document.getElementById("canvas1");
+let c2=document.getElementById("canvas2");
+let ctx=c.getContext("2d");
+let ctx2=c2.getContext("2d");
+let canvasWidth = c.clientWidth;
+let canvasHeight = c.clientHeight;
+window.addEventListener('wheel', (e) => {
+    if (e.deltaY < 0) {
+        main(++points,ctx, ctx2, canvasWidth, canvasHeight);
+    } else {
+        if (points > 0)
+            main(--points,ctx, ctx2, canvasWidth, canvasHeight);
+    }
+});
