@@ -3,6 +3,19 @@ function vec2(x,y) {
     return { x:x, y:y }
 }
 
+const main = (highlighted, pointAmount, ctx, ctx2, width, height) => {
+    ctx.clearRect(0,0,width,height);
+    ctx2.clearRect(0,0,width,height);
+    height = height - height*0.05;
+    width = width - width*0.05;
+    let pointsPerSection = pointAmount;
+    let dots = generate(pointAmount, Math.random(), width, height, pointsPerSection, functions);
+    // drawLines(dots, ctx);
+    drawCurves(dots, ctx2);
+    // drawCircles(dots, highlighted, ctx);
+    drawCircles(dots, highlighted, ctx2);
+};
+
 const generate = (pointsAmount, seed, width, height, pointsPerSection, functions) => {
     let startPoint = vec2(width / 2, height);
     let sections = Math.floor(pointsAmount / pointsPerSection);
@@ -15,14 +28,13 @@ const generate = (pointsAmount, seed, width, height, pointsPerSection, functions
         let tempPoints = functions[pickedFunction](pointsPerSection, seed, width, drawHeight, startPoint);
         startPoint = tempPoints[tempPoints.length-1];
         drawPoints = drawPoints.concat(tempPoints);
+        //drawPoints = tempPoints;
     }
     if (remaining >= 0) {
         let pickedFunction = Math.floor(Math.random()*functions.length);
         drawPoints = drawPoints.concat(functions[pickedFunction](remaining-1, seed, width, drawHeight, startPoint));
     }
     drawPoints.push(vec2(width/2, 0));
-    console.log(pointsAmount);
-    console.log(drawPoints.length);
     return drawPoints;
     // noise.seed(seed);
     // points = [];
@@ -42,15 +54,8 @@ const generate = (pointsAmount, seed, width, height, pointsPerSection, functions
 
 //Radius should go from .01 to 1
 const drawSpiral = (pointsAmount, radius, width, height, startPoint) => {
-    let points = [];
-    let currentPoint = startPoint;
-    for (let i = pointsAmount-1; i >= 0; i --) {
-        let newX = Math.sin(currentPoint.y)*radius*width/2+width/2;
-        let newY = startPoint.y-Math.cos(newX)*radius*height/2-height/2;
-        currentPoint = vec2(newX, newY);
-        points.push(currentPoint);
-    }
-    return points;
+    width = height;
+    return createSpiralDots(pointsAmount, startPoint, width, height);
 };
 
 
@@ -59,7 +64,9 @@ const drawVerticalSine = (pointsAmount, radius, width, height, startPoint) => {
     let points = [];
     let minimumSineRadius = 0.4;
     let currentPoint = startPoint;
+    let maxSineRadius = 0.8;
     if (radius < minimumSineRadius) radius += minimumSineRadius;
+    if (radius > maxSineRadius) radius = maxSineRadius;
     for (let i = pointsAmount-1; i >= 0; i --) {
         let increaseY = currentPoint.y - height/pointsAmount;
         let newX = Math.sin(height/pointsAmount*i)*radius*width/2+width/2;
@@ -88,42 +95,42 @@ const drawHorizontalCosine = (pointsAmount, radius, width, height, startPoint) =
     return points;
 };
 
-
-const main = (pointAmount, ctx, ctx2, width, height) => {
-    ctx.clearRect(0,0,width,height);
-    ctx2.clearRect(0,0,width,height);
-    let pointsPerSection = 10;
-    pointAmount = 10;
-    let dots = generate(pointAmount, Math.random(), width, height, pointsPerSection, functions);
-    drawLines(dots, ctx);
-    drawCurves(dots, ctx2);
-    drawCircles(dots, ctx);
-    drawCircles(dots, ctx2);
-};
-
-const drawCircles = (dots, context) => {
+const drawCircles = (dots, highlighted, context) => {
+    let counter = 0;
+    let color = 'blue';
+    console.log(dots);
     dots.map((dot) => {
-        drawCircle(dot, context);
+        counter++;
+        if (counter > highlighted)
+            color = 'green';
+
+        drawCircle(dot, color, context);
     })
+    console.log(counter);
 };
 
-const drawCircle = ({x, y}, context) => {
+const drawCircle = ({x, y}, color, context) => {
     context.beginPath();
     context.arc(x, y, 5, 0, 2 * Math.PI, false);
-    context.fillStyle = 'green';
+    context.fillStyle = color;
     context.fill();
 };
 
 const drawCurves = (points, ctx) => {
 
-    ctx.moveTo((points[0].x), points[0].y);
-    pts = [];
-    points.map(point => {
-        pts.push(point.x);
-        pts.push(point.y);
-    });
-    curve(ctx, pts);
-    ctx.stroke();
+    if (points && points.length > 0) {
+        ctx.moveTo((points[0].x), points[0].y);
+        let pts = [];
+        points.map(point => {
+            pts.push(point.x);
+            pts.push(point.y);
+        });
+        curve(ctx, pts);
+        ctx.stroke();
+        ctx.beginPath();
+        // ctx.fill();
+
+    }
 };
 
 const drawLines = (dots, context) => {
@@ -166,7 +173,7 @@ function curve(ctx, points, tension, numOfSeg, close) {
     tension = typeof tension === "number" ? tension : 0.5;
     numOfSeg = typeof numOfSeg === "number" ? numOfSeg : 25;
 
-    var pts,															// for cloning point array
+    let pts,															// for cloning point array
         i = 1,
         l = points.length,
         rPos = 0,
@@ -193,7 +200,7 @@ function curve(ctx, points, tension, numOfSeg, close) {
 
     for (; i < numOfSeg; i++) {
 
-        var st = i / numOfSeg,
+        let st = i / numOfSeg,
             st2 = st * st,
             st3 = st2 * st,
             st23 = st3 * 2,
@@ -221,9 +228,9 @@ function curve(ctx, points, tension, numOfSeg, close) {
 
     function parse(pts, cache, l, tension) {
 
-        for (var i = 2, t; i < l; i += 2) {
+        for (let i = 2, t; i < l; i += 2) {
 
-            var pt1 = pts[i],
+            let pt1 = pts[i],
                 pt2 = pts[i+1],
                 pt3 = pts[i+2],
                 pt4 = pts[i+3],
@@ -251,7 +258,6 @@ function curve(ctx, points, tension, numOfSeg, close) {
     l = close ? 0 : points.length - 2;
     res[rPos++] = points[l++];
     res[rPos] = points[l];
-
     // add lines to path
     for(i = 0, l = res.length; i < l; i += 2)
         ctx.lineTo(res[i], res[i+1]);
@@ -575,17 +581,6 @@ if (typeof exports !== "undefined") exports.curve = curve;
 
 
 let points = 0;
-// window.addEventListener('click', (ev) => {
-//     ev.preventDefault();
-//     main(++points);
-//     return false;
-// }, false);
-// window.addEventListener('contextmenu', (ev) => {
-//     ev.preventDefault();
-//     if (points > 0)
-//         main(--points);
-//     return false;
-// }, false);
 const functions = [];
 // functions.push(drawVerticalSine);
 // functions.push(drawHorizontalCosine);
@@ -596,11 +591,59 @@ let ctx=c.getContext("2d");
 let ctx2=c2.getContext("2d");
 let canvasWidth = c.clientWidth;
 let canvasHeight = c.clientHeight;
+
+let drawDots = (ctx, dotsAmount, width, height) => {
+    ctx.clearRect(0,0, width, height);
+    let dots = createSpiralDots(dotsAmount/2, vec2(80,200), width/4, height/4);
+     dots = dots.concat(createSpiralDots(dotsAmount/2, vec2(80,100), width/4, height/4));
+    drawCurves(dots, ctx);
+    drawCircles(dots, 1,ctx);
+};
+
+let createSpiralDots = (dotsAmount, startPoint, width, height) => {
+    dots = [];
+    let radius = 1;
+    let decrease = Math.PI*2;
+    for (i = 0; i <  dotsAmount - 1 ; i++) {
+        radius -= 0.06;
+        if (radius <= 0)
+            radius = 0;
+        dots.push(addDot(startPoint, width, height, radius, decrease, false));
+        decrease -= 16/dotsAmount;
+        //decrease--;
+    }
+    dots.push(vec2(width/2, startPoint.y - height));
+    // radius = 0;
+    // for (i = 0; i < dotsAmount/2 ; i++) {
+    //     radius += 0.05;
+    //     if (radius >= 1)
+    //         radius = 1;
+    //     dots.push(addDot(startPoint, 300, 300, radius, increase, true));
+    //     increase++;
+    // }
+    return dots;
+};
+
+let addDot = (origin, width, height, radius, increase, flipVertical) => {
+    let verticalMultiplier = 1;
+    if (flipVertical)
+        verticalMultiplier = -1;
+    width /= 2;
+    height /= 2;
+    let x = Math.sin(increase) * width * radius + origin.x;
+    let y = verticalMultiplier * Math.cos(increase) * height * radius + origin.y;
+    return(vec2(x,y));
+};
+
+drawDots(ctx, canvasWidth, canvasHeight);
 window.addEventListener('wheel', (e) => {
     if (e.deltaY < 0) {
-        main(++points,ctx, ctx2, canvasWidth, canvasHeight);
+        // drawDots(ctx, ++points, canvasWidth, canvasHeight)
+        main(15, ++points,ctx, ctx2, canvasWidth, canvasHeight);
+
     } else {
-        if (points > 0)
-            main(--points,ctx, ctx2, canvasWidth, canvasHeight);
+        if (points > 0);
+            // drawDots(ctx, --points, canvasWidth, canvasHeight)
+            main(15, --points,ctx, ctx2, canvasWidth, canvasHeight);
     }
 });
